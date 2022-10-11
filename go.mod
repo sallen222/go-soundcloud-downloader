@@ -8,7 +8,9 @@ require (
 )
 
 require (
+	github.com/bogem/id3v2 v1.2.0 // indirect
 	github.com/djimenez/iconv-go v0.0.0-20160305225143-8960e66bd3da // indirect
 	github.com/grafov/m3u8 v0.11.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	golang.org/x/text v0.3.2 // indirect
 )

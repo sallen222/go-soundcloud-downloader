@@ -1,14 +1,18 @@
 package main
 
-import(
-	"fmt"
-	"flag"
-	"github.com/zackradisic/soundcloud-api"
-	"log"
-	"os"
+import (
 	"encoding/csv"
+	"flag"
+	"fmt"
 	"io"
-	"github.com/mikkyang/id3-go"
+	"log"
+	"net/http"
+	"os"
+	"regexp"
+	"strconv"
+	"github.com/bogem/id3v2"
+	"github.com/zackradisic/soundcloud-api"
+	"strings"
 )
 
 func main() {
@@ -22,10 +26,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-	fmt.Println(sc.ClientID())
+
 	for index := range songs{
 		url := songs[index].url
-		fmt.Println(url)
+
 		if soundcloudapi.IsURL(url, true, true) {
 			tracks, err := sc.GetTrackInfo(soundcloudapi.GetTrackInfoOptions{
 				URL: url,
@@ -35,7 +39,9 @@ func main() {
 			}
 
 			for index2 := range tracks {
-				fileName := songs[index].title + " - " + songs[index].artist + ".mp3"
+				
+				fileName, _ := cleanFileName(songs[index].title + "-" + songs[index].artist + ".mp3")
+				
 				if !fileExists(fileName){
 					out, err := os.Create(fileName)
 
@@ -50,20 +56,48 @@ func main() {
 					if err != nil {
 						log.Fatal(err.Error())
 					}
+					
+					artworkURL := tracks[index2].ArtworkURL
+					jpgName, _ := cleanFileName(songs[index].title + "-" + songs[index].artist + ".jpg")
+					
+					addArtwork(artworkURL, jpgName)
+					
+					fmt.Println(jpgName)
 
-					mp3File, err := id3.Open(fileName)
-
+					tag, err := id3v2.Open(fileName, id3v2.Options{Parse: true})
 					if err != nil {
-						log.Fatal(err.Error())
+						log.Fatal("Error while opening mp3 file: ", err)
 					}
-					defer mp3File.Close()
+					defer tag.Close()
 
-					mp3File.SetArtist(songs[index].artist)
-					mp3File.SetTitle(songs[index].title)
+					artwork, err := os.ReadFile(jpgName)
+					if err != nil {
+						log.Fatal("Error while reading artwork file", err)
+					}
+				
+					pic := id3v2.PictureFrame{
+						Encoding:    id3v2.EncodingUTF8,
+						MimeType:    "image/jpeg",
+						PictureType: id3v2.PTFrontCover,
+						Description: "Front cover",
+						Picture:     artwork,
+					}
+
+					tag.AddAttachedPicture(pic)
+					tag.SetTitle(songs[index].title)
+					tag.SetArtist(songs[index].artist)
+
+					//err = os.Remove("jpgName")
+					//if err != nil {
+					//	log.Fatal(err)
+					//}
+
+					fmt.Println("Downloaded " + fileName)
+					
 				}
 			}
 		} else {
-			fmt.Println("URL is invalid")
+			fmt.Println("URL #"+ strconv.Itoa(index + 1) +" is invalid")
 		}
 	}	
 }
@@ -108,4 +142,36 @@ func fileExists(fileName string) bool {
 	if _, err := os.Stat(fileName); err == nil {			  
 		return true
 	} else {return false}
+}
+
+func addArtwork(url, fileName string) (string, error) {
+	response, err := http.Get(url)
+	if err != nil {
+		return "", err
+	}
+	defer response.Body.Close()
+	if response.StatusCode != 200 {
+		return "", err
+	}	
+
+	file, err := os.Create(fileName)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	_, err = io.Copy(file, response.Body)
+	if err != nil {
+		return "", err
+	}
+	
+	return fileName, nil
+}
+
+func cleanFileName(fileName string) (string, error) {
+	cleanName := strings.ReplaceAll(fileName, " ", "-")
+	r := regexp.MustCompile(`[<>:"/\\|?*]`)
+	cleanName = r.ReplaceAllString(cleanName, "")
+
+	return cleanName, nil
 }
