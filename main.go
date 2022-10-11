@@ -8,6 +8,7 @@ import(
 	"os"
 	"encoding/csv"
 	"io"
+	"github.com/mikkyang/id3-go"
 )
 
 func main() {
@@ -34,7 +35,7 @@ func main() {
 			}
 
 			for index2 := range tracks {
-				fileName := songs[index].title + ".mp3"
+				fileName := songs[index].title + " - " + songs[index].artist + ".mp3"
 
 				out, err := os.Create(fileName)
 
@@ -45,9 +46,20 @@ func main() {
 				defer out.Close()
 
 				err = sc.DownloadTrack(tracks[index2].Media.Transcodings[0], out)
+				
 				if err != nil {
 					log.Fatal(err.Error())
 				}
+
+				mp3File, err := id3.Open(fileName)
+
+				if err != nil {
+					log.Fatal(err.Error())
+				}
+				defer mp3File.Close()
+				
+				mp3File.SetArtist(songs[index].artist)
+				mp3File.SetTitle(songs[index].title)
 			}
 		} else {
 			fmt.Println("URL is invalid")
