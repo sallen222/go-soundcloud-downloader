@@ -36,30 +36,31 @@ func main() {
 
 			for index2 := range tracks {
 				fileName := songs[index].title + " - " + songs[index].artist + ".mp3"
+				if !fileExists(fileName){
+					out, err := os.Create(fileName)
 
-				out, err := os.Create(fileName)
+					if err != nil {
+						fmt.Println(err.Error())
+						return
+					}
+					defer out.Close()
 
-				if err != nil {
-					fmt.Println(err.Error())
-					return
+					err = sc.DownloadTrack(tracks[index2].Media.Transcodings[0], out)
+					
+					if err != nil {
+						log.Fatal(err.Error())
+					}
+
+					mp3File, err := id3.Open(fileName)
+
+					if err != nil {
+						log.Fatal(err.Error())
+					}
+					defer mp3File.Close()
+
+					mp3File.SetArtist(songs[index].artist)
+					mp3File.SetTitle(songs[index].title)
 				}
-				defer out.Close()
-
-				err = sc.DownloadTrack(tracks[index2].Media.Transcodings[0], out)
-				
-				if err != nil {
-					log.Fatal(err.Error())
-				}
-
-				mp3File, err := id3.Open(fileName)
-
-				if err != nil {
-					log.Fatal(err.Error())
-				}
-				defer mp3File.Close()
-				
-				mp3File.SetArtist(songs[index].artist)
-				mp3File.SetTitle(songs[index].title)
 			}
 		} else {
 			fmt.Println("URL is invalid")
@@ -101,4 +102,10 @@ func readCSV(fileName string) error{
 		songs = append(songs, song{title, artist, url})
 	}
 	return nil
+}
+
+func fileExists(fileName string) bool {
+	if _, err := os.Stat(fileName); err == nil {			  
+		return true
+	} else {return false}
 }
